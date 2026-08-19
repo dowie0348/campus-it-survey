@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>교내 정보자원 현황 조사</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Firebase SDK (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<style>
+  :root{
+    --bg:#EAF0EA;
+    --bg-deep:#DCE6DB;
+    --surface:#FFFFFF;
+    --ink:#1C2B22;
+    --ink-soft:#57685D;
+    --ink-faint:#8A988E;
+    --line:#C4D1C2;
+    --line-strong:#9FB49B;
+    --orange:#C4611D;
+    --orange-deep:#A3500F;
+    --teal:#2B5C68;
+    --teal-deep:#1E4550;
+    --red:#9C3B2C;
+    --radius-tag:14px;
+    --radius-card:18px;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 600px at 100% -10%, rgba(196,97,29,0.06), transparent 60%),
+      var(--bg);
+    color:var(--ink);
+    font-family:'IBM Plex Sans KR', -apple-system, sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    padding-bottom:56px;
+  }
+  .mono{font-family:'IBM Plex Mono', monospace;}
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;}
+  }
+
+  header.top{
+    padding:28px 20px 20px;
+    max-width:920px;
+    margin:0 auto;
+  }
+  .eyebrow{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    letter-spacing:0.14em;
+    color:var(--orange-deep);
+    text-transform:uppercase;
+    margin-bottom:10px;
+  }
+  .eyebrow::before{
+    content:"";
+    width:7px;height:7px;border-radius:50%;
+    background:var(--orange);
+    box-shadow:0 0 0 3px rgba(196,97,29,0.18);
+  }
+  h1.title{
+    font-size:clamp(24px,5vw,34px);
+    font-weight:700;
+    letter-spacing:-0.01em;
+    margin:0 0 8px;
+    line-height:1.25;
+  }
+  p.subtitle{
+    color:var(--ink-soft);
+    font-size:14.5px;
+    line-height:1.6;
+    margin:0;
+    max-width:56ch;
+  }
+  .shared-note{
+    margin-top:14px;
+    font-size:12.5px;
+    color:var(--teal-deep);
+    background:rgba(43,92,104,0.08);
+    border:1px solid rgba(43,92,104,0.18);
+    padding:8px 12px;
+    border-radius:10px;
+    display:inline-flex;
+    gap:8px;
+    align-items:flex-start;
+  }
+
+  nav.tabs{
+    max-width:920px;
+    margin:0 auto;
+    padding:0 20px;
+    display:flex;
+    gap:6px;
+    border-bottom:1px solid var(--line);
+    position:sticky;
+    top:0;
+    background:var(--bg);
+    z-index:10;
+    padding-top:8px;
+  }
+  nav.tabs button{
+    appearance:none;
+    border:none;
+    background:transparent;
+    font-family:inherit;
+    font-size:14.5px;
+    font-weight:600;
+    color:var(--ink-faint);
+    padding:12px 14px 14px;
+    cursor:pointer;
+    position:relative;
+    display:flex;
+    align-items:center;
+    gap:7px;
+  }
+  nav.tabs button .count{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    background:var(--bg-deep);
+    color:var(--ink-soft);
+    padding:1px 6px;
+    border-radius:20px;
+  }
+  nav.tabs button.active{color:var(--ink);}
+  nav.tabs button.active .count{background:var(--orange); color:#fff;}
+  nav.tabs button::after{
+    content:"";
+    position:absolute; left:10px; right:10px; bottom:-1px; height:3px;
+    background:var(--orange);
+    border-radius:3px 3px 0 0;
+    transform:scaleX(0);
+    transition:transform .2s ease;
+  }
+  nav.tabs button.active::after{transform:scaleX(1);}
+
+  main{max-width:920px; margin:0 auto; padding:22px 20px 60px;}
+
+  .field-row{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:22px;}
+  @media (max-width:480px){.field-row{grid-template-columns:1fr;}}
+  label.field-label{
+    display:block;
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:0.05em;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+    margin-bottom:6px;
+  }
+  input.text-input{
+    width:100%;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:15px;
+    padding:12px 13px;
+    border:1.5px solid var(--line-strong);
+    border-radius:10px;
+    background:var(--surface);
+    color:var(--ink);
+    outline:none;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  input.text-input:focus{
+    border-color:var(--orange);
+    box-shadow:0 0 0 3px rgba(196,97,29,0.15);
+  }
+  input.text-input::placeholder{color:var(--ink-faint); font-family:'IBM Plex Mono', monospace;}
+
+  .section-heading{
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin:28px 0 12px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .section-heading::after{content:""; flex:1; height:1px; background:var(--line);}
+
+  .tag-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+  }
+  @media (max-width:560px){.tag-grid{grid-template-columns:1fr;}}
+
+  .tag-card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--radius-card);
+    padding:16px 16px 14px;
+    position:relative;
+    box-shadow:0 1px 0 rgba(28,43,34,0.03);
+  }
+  .tag-card .tag-hole{
+    position:absolute;
+    top:14px; left:16px;
+    width:14px; height:14px;
+    border-radius:50%;
+    background:var(--bg);
+    border:1.5px solid var(--line-strong);
+    box-shadow:inset 0 1px 2px rgba(0,0,0,0.08);
+  }
+  .tag-card .tag-title{
+    font-weight:600;
+    font-size:14.5px;
+    padding-left:26px;
+    margin-bottom:2px;
+  }
+  .tag-card .tag-help{
+    font-size:12px;
+    color:var(--ink-faint);
+    padding-left:26px;
+    margin-bottom:12px;
+  }
+  .preview-slot{
+    height:150px;
+    border-radius:var(--radius-tag);
+    border:1.5px dashed var(--line-strong);
+    background:
+      repeating-linear-gradient(135deg, rgba(159,180,155,0.10) 0 8px, transparent 8px 16px);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:4px;
+    color:var(--ink-faint);
+    font-size:12px;
+    overflow:hidden;
+    position:relative;
+    margin-bottom:12px;
+  }
+  .preview-slot.filled{
+    border-style:solid;
+    border-color:var(--line);
+    background:#000;
+  }
+  .preview-slot img{
+    width:100%; height:100%; object-fit:cover; display:block;
+  }
+  .preview-slot .stamp{
+    position:absolute;
+    top:8px; right:8px;
+    background:var(--orange);
+    color:#fff;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:0.04em;
+    padding:3px 8px;
+    border-radius:20px;
+    transform:rotate(3deg);
+    animation:stamp-in .25s cubic-bezier(.2,1.4,.4,1);
+  }
+  @keyframes stamp-in{
+    from{transform:rotate(3deg) scale(0.5); opacity:0;}
+    to{transform:rotate(3deg) scale(1); opacity:1;}
+  }
+  .btn-row{display:flex; gap:8px;}
+  .btn{
+    flex:1;
+    appearance:none;
+    border:none;
+    border-radius:10px;
+    padding:10px 8px;
+    font-family:inherit;
+    font-size:12.5px;
+    font-weight:600;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    transition:transform .1s, filter .1s;
+  }
+  .btn:active{transform:scale(0.97);}
+  .btn-camera{background:var(--orange); color:#fff;}
+  .btn-camera:hover{filter:brightness(1.06);}
+  .btn-upload{background:var(--teal); color:#fff;}
+  .btn-upload:hover{filter:brightness(1.08);}
+  input[type=file]{display:none;}
+
+  .submit-bar{
+    margin-top:30px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    flex-wrap:wrap;
+  }
+  .btn-submit{
+    background:var(--ink);
+    color:#fff;
+    border:none;
+    border-radius:12px;
+    padding:14px 26px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:14px;
+    font-weight:600;
+    letter-spacing:0.03em;
+    cursor:pointer;
+    display:flex; align-items:center; gap:8px;
+  }
+  .btn-submit:hover{background:#0f1a13;}
+  .btn-submit:disabled{background:var(--ink-faint); cursor:not-allowed;}
+  .submit-hint{font-size:12.5px; color:var(--ink-faint);}
+
+  .toast{
+    position:fixed;
+    left:50%; bottom:26px;
+    transform:translateX(-50%) translateY(20px);
+    background:var(--ink);
+    color:#fff;
+    padding:13px 20px;
+    border-radius:12px;
+    font-size:14px;
+    font-weight:500;
+    display:flex; align-items:center; gap:10px;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .2s, transform .2s;
+    z-index:100;
+    box-shadow:0 10px 30px rgba(0,0,0,0.25);
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .toast .seal{
+    width:22px; height:22px; border-radius:50%;
+    background:var(--red);
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; flex-shrink:0;
+    border:2px solid rgba(255,255,255,0.5);
+  }
+
+  .admin-toolbar{
+    display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; align-items:center;
+  }
+  .search-input{
+    flex:1; min-width:180px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13.5px;
+    padding:10px 13px;
+    border:1.5px solid var(--line-strong);
+    border-radius:10px;
+    background:var(--surface);
+  }
+  .icon-btn{
+    border:1.5px solid var(--line-strong);
+    background:var(--surface);
+    border-radius:10px;
+    padding:9px 13px;
+    font-size:13px;
+    font-weight:600;
+    color:var(--ink-soft);
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .icon-btn:hover{border-color:var(--orange); color:var(--orange-deep);}
+  .icon-btn.danger:hover{border-color:var(--red); color:var(--red);}
+
+  .record-list{display:flex; flex-direction:column; gap:10px;}
+  .record-row{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:14px 16px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    cursor:pointer;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  .record-row:hover{border-color:var(--line-strong); box-shadow:0 2px 10px rgba(28,43,34,0.06);}
+  .record-thumbs{display:flex; gap:4px; flex-shrink:0;}
+  .record-thumbs .th{
+    width:34px; height:34px; border-radius:7px;
+    background:var(--bg-deep);
+    overflow:hidden;
+    border:1px solid var(--line);
+  }
+  .record-thumbs .th img{width:100%; height:100%; object-fit:cover; display:block;}
+  .record-main{flex:1; min-width:0;}
+  .record-name{font-weight:700; font-size:15px; margin-bottom:2px;}
+  .record-meta{font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--ink-faint); display:flex; gap:10px; flex-wrap:wrap;}
+  .record-chevron{color:var(--ink-faint); font-size:18px;}
+
+  .empty-state{
+    text-align:center;
+    padding:60px 20px;
+    color:var(--ink-faint);
+  }
+  .empty-state .glyph{font-size:32px; margin-bottom:10px;}
+  .empty-state p{font-size:14px; line-height:1.7; max-width:36ch; margin:0 auto;}
+
+  .loading-line{
+    display:flex; align-items:center; gap:10px;
+    color:var(--ink-faint); font-size:13.5px; padding:30px 0;
+    font-family:'IBM Plex Mono', monospace;
+  }
+  .spinner{
+    width:14px; height:14px; border-radius:50%;
+    border:2px solid var(--line-strong);
+    border-top-color:var(--orange);
+    animation:spin .7s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(20,28,22,0.55);
+    display:flex; align-items:flex-end; justify-content:center;
+    z-index:200; opacity:0; pointer-events:none; transition:opacity .2s;
+  }
+  @media (min-width:700px){.modal-backdrop{align-items:center;}}
+  .modal-backdrop.show{opacity:1; pointer-events:auto;}
+  .modal{
+    background:var(--bg);
+    width:100%; max-width:640px;
+    max-height:88vh;
+    border-radius:20px 20px 0 0;
+    overflow-y:auto;
+    padding:22px 22px 30px;
+    transform:translateY(30px);
+    transition:transform .2s;
+  }
+  @media (min-width:700px){.modal{border-radius:20px;}}
+  .modal-backdrop.show .modal{transform:translateY(0);}
+  .modal-head{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;}
+  .modal-close{
+    border:none; background:var(--bg-deep); width:30px; height:30px; border-radius:50%;
+    font-size:15px; cursor:pointer; color:var(--ink-soft); flex-shrink:0;
+  }
+  .modal-name{font-size:20px; font-weight:700;}
+  .modal-meta{font-family:'IBM Plex Mono', monospace; font-size:12.5px; color:var(--ink-faint); margin-top:4px; margin-bottom:20px;}
+  .modal-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:18px;}
+  @media (max-width:480px){.modal-grid{grid-template-columns:1fr;}}
+  .modal-photo{
+    border-radius:var(--radius-tag);
+    overflow:hidden;
+    border:1px solid var(--line);
+    background:var(--bg-deep);
+  }
+  .modal-photo .cap{
+    font-size:11px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase;
+    color:var(--ink-soft); padding:8px 10px 6px;
+  }
+  .modal-photo img{width:100%; display:block; aspect-ratio:4/3; object-fit:cover;}
+  .modal-photo .none{
+    aspect-ratio:4/3; display:flex; align-items:center; justify-content:center;
+    color:var(--ink-faint); font-size:12px;
+  }
+  .modal-actions{display:flex; justify-content:flex-end;}
+
+  .setup-banner{
+    max-width:920px; margin:0 auto; padding:0 20px;
+  }
+  .setup-banner .inner{
+    background:#FFF4E8;
+    border:1.5px solid var(--orange);
+    color:var(--orange-deep);
+    border-radius:12px;
+    padding:12px 16px;
+    font-size:13px;
+    line-height:1.7;
+  }
+  .setup-banner code{
+    background:rgba(0,0,0,0.06);
+    padding:1px 5px;
+    border-radius:5px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="eyebrow">RFID 촬영 기반 자산 조사</div>
+  <h1 class="title">교내 정보자원 현황 조사</h1>
+  <p class="subtitle">PC와 듀얼 모니터를 돌며 RFID 자산 태그를 사진으로 찍어 올리면, 모델명과 도입년월은 관리 페이지에서 사진을 보고 한꺼번에 정리할 수 있어요.</p>
+  <div class="shared-note">🔗&nbsp; 이곳에 올린 사진과 정보는 Firebase에 저장되어 이 링크에 접속하는 모든 사람과 공유됩니다.</div>
+</header>
+
+<div class="setup-banner" id="setupBanner" style="display:none;">
+  <div class="inner">
+    ⚠️ Firebase 설정이 필요해요. 코드 맨 위 <code>firebaseConfig</code> 값을 본인의 Firebase 프로젝트 설정으로 바꿔주세요. 설정 전에는 저장·조회가 동작하지 않습니다.
+  </div>
+</div>
+
+<nav class="tabs">
+  <button class="active" data-tab="form" onclick="switchTab('form')">✏️ 조사 입력</button>
+  <button data-tab="admin" onclick="switchTab('admin')">🗂 관리 대시보드 <span class="count" id="recordCount">0</span></button>
+</nav>
+
+<main>
+  <!-- ============ FORM VIEW ============ -->
+  <section id="view-form">
+    <div class="field-row">
+      <div>
+        <label class="field-label" for="pcName">PC이름</label>
+        <input class="text-input" id="pcName" placeholder="예: 2-3반-01" autocomplete="off">
+      </div>
+      <div>
+        <label class="field-label" for="pcIp">IP</label>
+        <input class="text-input" id="pcIp" placeholder="예: 192.168.0.101" autocomplete="off">
+      </div>
+      <div>
+        <label class="field-label" for="pcLocation">설치 장소</label>
+        <input class="text-input" id="pcLocation" placeholder="예: 본관 2층 2-3반" autocomplete="off">
+      </div>
+      <div>
+        <label class="field-label" for="pcCmos">CMOS</label>
+        <input class="text-input" id="pcCmos" placeholder="CMOS 정보를 입력하세요" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="section-heading">RFID 태그 촬영</div>
+    <div class="tag-grid" id="tagGrid"></div>
+
+    <div class="submit-bar">
+      <button class="btn-submit" id="submitBtn" onclick="submitRecord()">📌 제출하기</button>
+      <span class="submit-hint">PC이름 · IP · 컴퓨터 본체 사진은 필수예요.</span>
+    </div>
+  </section>
+
+  <!-- ============ ADMIN VIEW ============ -->
+  <section id="view-admin" style="display:none;">
+    <div class="admin-toolbar">
+      <input class="search-input" id="searchInput" placeholder="PC이름으로 검색" oninput="renderRecordList()">
+      <button class="icon-btn" onclick="loadRecords()">↻ 새로고침</button>
+      <button class="icon-btn danger" onclick="clearAllRecords()">전체 초기화</button>
+    </div>
+    <div id="adminBody"></div>
+  </section>
+</main>
+
+<div class="toast" id="toast"><span class="seal">✓</span><span id="toastText"></span></div>
+
+<div class="modal-backdrop" id="modalBackdrop" onclick="if(event.target===this) closeModal()">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<script>
+// ====== ① Firebase 설정: 본인 프로젝트 값으로 바꿔주세요 (firebase console > 프로젝트 설정 > 일반) ======
+const firebaseConfig = {
+  apiKey: "AIzaSyCUMLhP936XRIrvYTM9m12rtiKc_r9OYGo",
+  authDomain: "campus-it-survey.firebaseapp.com",
+  projectId: "campus-it-survey",
+  storageBucket: "campus-it-survey.firebasestorage.app",
+  messagingSenderId: "153586899421",
+  appId: "1:153586899421:web:be1491dd4cbea5993b3e34"
+};
+
+let db, storageRef, firebaseReady = false;
+try{
+  if(firebaseConfig.apiKey && firebaseConfig.apiKey !== 'YOUR_API_KEY'){
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    storageRef = firebase.storage();
+    firebaseReady = true;
+  }
+}catch(e){
+  console.error('Firebase 초기화 실패', e);
+}
+if(!firebaseReady){
+  document.getElementById('setupBanner').style.display = 'block';
+}
+
+const CATEGORIES = [
+  { key:'body',     title:'컴퓨터 본체', help:'본체 옆/뒷면 RFID 태그' },
+  { key:'monitor1', title:'모니터 1',    help:'모니터1 뒷면 RFID 태그' },
+  { key:'monitor2', title:'모니터 2',    help:'모니터2 뒷면 RFID 태그' },
+  { key:'printer',  title:'프린터',      help:'프린터 RFID 태그 (없으면 생략)' },
+];
+
+let formImages = {}; // key -> { blob, dataUrl }
+let records = [];    // loaded from Firestore
+
+// ---------- Tabs ----------
+function switchTab(tab){
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  document.getElementById('view-form').style.display = tab==='form' ? '' : 'none';
+  document.getElementById('view-admin').style.display = tab==='admin' ? '' : 'none';
+  if(tab==='admin' && firebaseReady) loadRecords();
+  if(tab==='admin' && !firebaseReady){
+    document.getElementById('adminBody').innerHTML = `<div class="empty-state"><div class="glyph">⚠️</div><p>Firebase 설정을 완료하면 조사 목록을 볼 수 있어요.</p></div>`;
+  }
+}
+
+// ---------- Build tag cards ----------
+function buildTagGrid(){
+  const grid = document.getElementById('tagGrid');
+  grid.innerHTML = CATEGORIES.map(c => `
+    <div class="tag-card">
+      <div class="tag-hole"></div>
+      <div class="tag-title">${c.title}</div>
+      <div class="tag-help">${c.help}</div>
+      <div class="preview-slot" id="preview-${c.key}">
+        <span>📎</span><span>아직 촬영된 사진이 없어요</span>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-camera" onclick="document.getElementById('camera-${c.key}').click()">📷 사진 찍기</button>
+        <button class="btn btn-upload" onclick="document.getElementById('upload-${c.key}').click()">📁 파일 업로드</button>
+      </div>
+      <input type="file" accept="image/*" capture="environment" id="camera-${c.key}" onchange="handleFile(this,'${c.key}')">
+      <input type="file" accept="image/*" id="upload-${c.key}" onchange="handleFile(this,'${c.key}')">
+    </div>
+  `).join('');
+}
+buildTagGrid();
+
+// ---------- Image compression ----------
+function compressImage(file, maxWidth=1000, quality=0.6){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if(w > maxWidth){ h = Math.round(h * (maxWidth / w)); w = maxWidth; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(blob => {
+          if(!blob){ reject(new Error('이미지 변환에 실패했어요.')); return; }
+          resolve({ blob, dataUrl: canvas.toDataURL('image/jpeg', quality) });
+        }, 'image/jpeg', quality);
+      };
+      img.onerror = () => reject(new Error('이미지를 읽을 수 없어요.'));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error('파일을 읽을 수 없어요.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleFile(inputEl, key){
+  const file = inputEl.files && inputEl.files[0];
+  if(!file) return;
+  const slot = document.getElementById(`preview-${key}`);
+  slot.innerHTML = `<span class="mono" style="font-size:11px;">처리 중...</span>`;
+  try{
+    const { blob, dataUrl } = await compressImage(file);
+    formImages[key] = { blob, dataUrl };
+    slot.classList.add('filled');
+    slot.innerHTML = `<img src="${dataUrl}" alt="${key} 사진"><span class="stamp">촬영됨</span>`;
+  }catch(err){
+    slot.classList.remove('filled');
+    slot.innerHTML = `<span>⚠️</span><span>${err.message || '처리 실패, 다시 시도해주세요'}</span>`;
+  }
+  inputEl.value = '';
+}
+
+// ---------- Toast ----------
+let toastTimer;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  document.getElementById('toastText').textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+
+// ---------- Submit ----------
+async function submitRecord(){
+  if(!firebaseReady){
+    showToast('Firebase 설정을 먼저 완료해주세요.');
+    return;
+  }
+  const pcName = document.getElementById('pcName').value.trim();
+  const ip = document.getElementById('pcIp').value.trim();
+  const location = document.getElementById('pcLocation').value.trim();
+  const cmos = document.getElementById('pcCmos').value.trim();
+  if(!pcName || !ip){
+    showToast('PC이름과 IP를 입력해주세요.');
+    return;
+  }
+  if(!formImages.body){
+    showToast('컴퓨터 본체 RFID 사진은 꼭 찍어주세요.');
+    return;
+  }
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '업로드 중...';
+
+  const id = db.collection('pcRecords').doc().id;
+
+  try{
+    const imageUrls = {};
+    for(const key of Object.keys(formImages)){
+      const ref = storageRef.ref().child(`pc-photos/${id}/${key}.jpg`);
+      await ref.put(formImages[key].blob);
+      imageUrls[key] = await ref.getDownloadURL();
+    }
+    await db.collection('pcRecords').doc(id).set({
+      pcName, ip, location, cmos,
+      images: imageUrls,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    showToast(`"${pcName}" 등록 완료!`);
+    // reset form
+    document.getElementById('pcName').value = '';
+    document.getElementById('pcIp').value = '';
+    document.getElementById('pcLocation').value = '';
+    document.getElementById('pcCmos').value = '';
+    formImages = {};
+    buildTagGrid();
+  }catch(err){
+    console.error('저장 실패', err);
+    showToast('저장에 실패했어요. 다시 시도해주세요.');
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '📌 제출하기';
+  }
+}
+
+// ---------- Admin: load & render ----------
+async function loadRecords(){
+  if(!firebaseReady) return;
+  const body = document.getElementById('adminBody');
+  body.innerHTML = `<div class="loading-line"><span class="spinner"></span>조사 목록을 불러오는 중...</div>`;
+  try{
+    const snapshot = await db.collection('pcRecords').orderBy('createdAt', 'desc').get();
+    records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    renderRecordList();
+  }catch(err){
+    console.error('목록 조회 실패', err);
+    body.innerHTML = `<div class="empty-state"><div class="glyph">⚠️</div><p>목록을 불러오지 못했어요. 새로고침을 눌러 다시 시도해주세요.</p></div>`;
+  }
+}
+
+function formatDate(ts){
+  if(!ts) return '-';
+  const d = typeof ts.toDate === 'function' ? ts.toDate() : new Date(ts);
+  return d.toLocaleString('ko-KR', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+}
+
+function renderRecordList(){
+  document.getElementById('recordCount').textContent = records.length;
+  const q = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+  const filtered = q ? records.filter(r => (r.pcName||'').toLowerCase().includes(q)) : records;
+
+  const body = document.getElementById('adminBody');
+  if(records.length === 0){
+    body.innerHTML = `<div class="empty-state"><div class="glyph">🗂</div><p>아직 등록된 조사 항목이 없어요.<br>'조사 입력' 탭에서 RFID 사진을 올려보세요.</p></div>`;
+    return;
+  }
+  if(filtered.length === 0){
+    body.innerHTML = `<div class="empty-state"><div class="glyph">🔍</div><p>'${q}'에 해당하는 PC를 찾지 못했어요.</p></div>`;
+    return;
+  }
+  body.innerHTML = `<div class="record-list">${filtered.map(r => {
+    const thumbs = CATEGORIES.filter(c => r.images && r.images[c.key])
+      .map(c => `<div class="th"><img src="${r.images[c.key]}" alt=""></div>`).join('');
+    const photoCount = CATEGORIES.filter(c => r.images && r.images[c.key]).length;
+    const date = formatDate(r.createdAt);
+    return `
+      <div class="record-row" onclick="openRecord('${r.id}')">
+        <div class="record-thumbs">${thumbs || '<div class="th"></div>'}</div>
+        <div class="record-main">
+          <div class="record-name">${escapeHtml(r.pcName || '(이름 없음)')}</div>
+          <div class="record-meta"><span>${escapeHtml(r.ip || '-')}</span><span>${escapeHtml(r.location || '장소 미기재')}</span><span>${date}</span><span>사진 ${photoCount}/${CATEGORIES.length}</span></div>
+          ${r.cmos ? `<div class="record-meta" style="margin-top:3px;">CMOS: ${escapeHtml(r.cmos)}</div>` : ''}
+        </div>
+        <div class="record-chevron">›</div>
+      </div>`;
+  }).join('')}</div>`;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ---------- Modal detail ----------
+function openRecord(id){
+  const r = records.find(x => x.id === id);
+  if(!r) return;
+  const date = r.createdAt ? formatDate(r.createdAt) : '-';
+  document.getElementById('modalContent').innerHTML = `
+    <div class="modal-head">
+      <div>
+        <div class="modal-name">${escapeHtml(r.pcName || '(이름 없음)')}</div>
+        <div class="modal-meta">IP ${escapeHtml(r.ip || '-')} · ${escapeHtml(r.location || '장소 미기재')} · 등록 ${date}${r.cmos ? ' · CMOS ' + escapeHtml(r.cmos) : ''}</div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-grid">
+      ${CATEGORIES.map(c => `
+        <div class="modal-photo">
+          <div class="cap">${c.title}</div>
+          ${ r.images && r.images[c.key]
+            ? `<img src="${r.images[c.key]}" alt="${c.title}">`
+            : `<div class="none">사진 없음</div>` }
+        </div>
+      `).join('')}
+    </div>
+    <div class="modal-actions">
+      <button class="icon-btn danger" onclick="deleteRecord('${r.id}')">이 항목 삭제</button>
+    </div>
+  `;
+  document.getElementById('modalBackdrop').classList.add('show');
+}
+function closeModal(){
+  document.getElementById('modalBackdrop').classList.remove('show');
+}
+
+async function deleteRecord(id){
+  if(!confirm('이 조사 항목을 삭제할까요? 삭제한 사진은 복구할 수 없어요.')) return;
+  try{
+    const r = records.find(x => x.id === id);
+    if(r && r.images){
+      for(const key of Object.keys(r.images)){
+        try{ await storageRef.ref().child(`pc-photos/${id}/${key}.jpg`).delete(); }
+        catch(e){ console.warn('사진 삭제 실패(무시)', key, e); }
+      }
+    }
+    await db.collection('pcRecords').doc(id).delete();
+    records = records.filter(r => r.id !== id);
+    renderRecordList();
+    closeModal();
+    showToast('삭제했어요.');
+  }catch(err){
+    console.error('delete 실패', err);
+    showToast('삭제에 실패했어요.');
+  }
+}
+
+async function clearAllRecords(){
+  if(records.length === 0){ showToast('삭제할 항목이 없어요.'); return; }
+  if(!confirm(`등록된 ${records.length}건을 모두 삭제할까요? 이 작업은 모든 사용자의 데이터에 영향을 주며 되돌릴 수 없어요.`)) return;
+  const body = document.getElementById('adminBody');
+  body.innerHTML = `<div class="loading-line"><span class="spinner"></span>삭제하는 중...</div>`;
+  try{
+    for(const r of records){
+      try{
+        if(r.images){
+          for(const key of Object.keys(r.images)){
+            try{ await storageRef.ref().child(`pc-photos/${r.id}/${key}.jpg`).delete(); }
+            catch(e){ /* 무시 */ }
+          }
+        }
+        await db.collection('pcRecords').doc(r.id).delete();
+      }
+      catch(e){ console.warn('개별 삭제 실패', r.id, e); }
+    }
+    records = [];
+    renderRecordList();
+    showToast('전체 초기화했어요.');
+  }catch(err){
+    console.error('전체 삭제 실패', err);
+    showToast('초기화 중 오류가 발생했어요.');
+  }
+}
+</script>
+</body>
+</html>
